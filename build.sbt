@@ -1,6 +1,6 @@
 organization         := "io.stat.tools"
 name                 := "s3crawl"
-version              := "0.2-SNAPSHOT"
+version              := "0.3-SNAPSHOT"
 
 scalaVersion         := "2.11.8"
 scalacOptions       ++= Seq(

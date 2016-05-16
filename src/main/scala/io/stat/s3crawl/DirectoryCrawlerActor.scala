@@ -29,6 +29,11 @@ class DirectoryCrawlerActor(
 
   implicit val timeout: Timeout = new Timeout(2 days) // lol?
 
+  val s3Request = new ListObjectsV2Request()
+    .withBucketName(settings.bucket)
+    .withPrefix(directory)
+    .withMaxKeys(10000)
+
   @tailrec final def throttleConsumption(): Boolean = {
     Try(Await.result(dispatcher ? Messages.BackPressureStatus, Duration.Inf)) match {
       case Success(Messages.NoPressure)     => true
@@ -67,20 +72,14 @@ class DirectoryCrawlerActor(
     }
 
     if(listing.isTruncated) {
-      listing.setContinuationToken(listing.getNextContinuationToken)
-      consumeListingResult(listing)
+      s3Request.setContinuationToken(listing.getNextContinuationToken)
+      consumeListingResult(s3Client.listObjectsV2(s3Request))
     }
   }
 
   def crawlDirectory(): Unit = {
-    val request = new ListObjectsV2Request()
-      .withBucketName(settings.bucket)
-      .withPrefix(directory)
-      .withMaxKeys(10000)
-
-    if(recurse) request.setDelimiter("/")
-
-    val listing = s3Client.listObjectsV2(request)
+    if(recurse) s3Request.setDelimiter("/")
+    val listing = s3Client.listObjectsV2(s3Request)
     consumeListingResult(listing)
 
     dispatcher ! Messages.DirectoryComplete(directory)
@@ -88,7 +87,7 @@ class DirectoryCrawlerActor(
   }
 
   override def receive: Receive = {
-    case Messages.Begin    => crawlDirectory()
+    case Messages.Begin  => crawlDirectory()
     case unk: Any => logError(s"Unknown message $unk")
   }
 }
